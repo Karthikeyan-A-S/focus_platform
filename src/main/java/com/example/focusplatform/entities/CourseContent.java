@@ -1,5 +1,6 @@
 package com.example.focusplatform.entities;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -19,6 +20,8 @@ public class CourseContent {
 
     private String mediaUrl;
 
+    // "Back" side — CourseContent points to Course, Course owns the list
+    @JsonBackReference("course-contents")
     @ManyToOne
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;

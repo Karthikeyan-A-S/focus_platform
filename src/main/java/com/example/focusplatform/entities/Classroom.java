@@ -1,5 +1,7 @@
 package com.example.focusplatform.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.List;
@@ -18,12 +20,12 @@ public class Classroom {
     @Column(unique = true, nullable = false)
     private String inviteCode;
 
-    // The teacher who owns the class
     @ManyToOne
     @JoinColumn(name = "teacher_id", nullable = false)
     private User teacher;
 
-    // The students who joined
+    // Students — ignore to avoid User ↔ Classroom loop
+    @JsonIgnore
     @ManyToMany
     @JoinTable(
             name = "enrollments",
@@ -32,6 +34,8 @@ public class Classroom {
     )
     private List<User> students;
 
+    // "Managed" side — Classroom owns this list, Course points back with @JsonBackReference
+    @JsonManagedReference("classroom-courses")
     @OneToMany(mappedBy = "classroom", cascade = CascadeType.ALL)
     private List<Course> courses;
 }

@@ -1,5 +1,6 @@
 package com.example.focusplatform.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.List;
@@ -18,13 +19,16 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    // Never expose the password hash in any API response
+    @JsonIgnore
     @Column(nullable = false)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    // Students enrolled in classes (Many-to-Many junction table)
+    // Ignore to avoid User ↔ Classroom ↔ User loop
+    @JsonIgnore
     @ManyToMany(mappedBy = "students")
     private List<Classroom> enrolledClasses;
 }

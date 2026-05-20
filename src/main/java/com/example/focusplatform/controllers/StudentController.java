@@ -3,10 +3,14 @@ package com.example.focusplatform.controllers;
 import com.example.focusplatform.dto.EnrollmentRequest;
 import com.example.focusplatform.dto.QuizSubmitRequest;
 import com.example.focusplatform.entities.Classroom;
+import com.example.focusplatform.entities.CourseContent;
+import com.example.focusplatform.entities.Question;
 import com.example.focusplatform.services.StudentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/student")
@@ -23,6 +27,18 @@ public class StudentController {
         String studentEmail = authentication.getName();
         Classroom classroom = studentService.enrollInClassroom(studentEmail, request.getInviteCode());
         return ResponseEntity.ok("Successfully enrolled in classroom: " + classroom.getName());
+    }
+
+    // --- NEW: Fetch Course Content ---
+    @GetMapping("/courses/{courseId}/content")
+    public ResponseEntity<List<CourseContent>> getCourseContent(@PathVariable Long courseId) {
+        return ResponseEntity.ok(studentService.getCourseContent(courseId));
+    }
+
+    // --- NEW: Fetch Quiz Questions ---
+    @GetMapping("/courses/{courseId}/questions")
+    public ResponseEntity<List<Question>> getCourseQuestions(@PathVariable Long courseId) {
+        return ResponseEntity.ok(studentService.getCourseQuestions(courseId));
     }
 
     @PostMapping("/submit")

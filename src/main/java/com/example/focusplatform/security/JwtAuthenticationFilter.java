@@ -2,6 +2,7 @@ package com.example.focusplatform.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,20 +28,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Look for the Authorization header
-        final String authHeader = request.getHeader("Authorization");
+        String jwt = null;
 
-        // 2. If it's missing or doesn't start with "Bearer ", reject and move on
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // 1. First, try to get the token from the Authorization header (for API clients / Postman)
+        final String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+        }
+
+        // 2. If not in the header, look inside the HttpOnly cookie (for browser clients)
+        if (jwt == null) {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie cookie : cookies) {
+                    if ("jwt".equals(cookie.getName())) {
+                        jwt = cookie.getValue();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3. If we still have no token, skip authentication and move on
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 3. Extract the token and the email
-        final String jwt = authHeader.substring(7);
-        final String userEmail = jwtUtil.extractEmail(jwt);
+        // 4. Extract the email from the token
+        final String userEmail;
+        try {
+            userEmail = jwtUtil.extractEmail(jwt);
+        } catch (Exception e) {
+            // Token is malformed — treat as unauthenticated
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-        // 4. If we have an email and the user isn't already authenticated in this session
+        // 5. If we have an email and the user isn't already authenticated in this session
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             if (jwtUtil.isTokenValid(jwt, userEmail)) {

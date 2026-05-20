@@ -1,10 +1,7 @@
 package com.example.focusplatform.services;
 
 // 1. All the new imports added here!
-import com.example.focusplatform.dto.ClassroomCreateRequest;
-import com.example.focusplatform.dto.ContentCreateRequest;
-import com.example.focusplatform.dto.CourseCreateRequest;
-import com.example.focusplatform.dto.QuestionCreateRequest;
+import com.example.focusplatform.dto.*;
 import com.example.focusplatform.entities.Classroom;
 import com.example.focusplatform.entities.Course;
 import com.example.focusplatform.entities.CourseContent;
@@ -17,7 +14,9 @@ import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TeacherService {
@@ -92,4 +91,34 @@ public class TeacherService {
 
         return courseRepository.save(course);
     }
+    // Add this to TeacherService.java
+
+
+    public List<ClassroomSummaryDTO> getClassroomsByTeacher(String email) {
+        User teacher = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Teacher not found"));
+
+        List<Classroom> classrooms = classroomRepository.findByTeacher(teacher);
+
+        // Convert the full Classroom entities into lightweight DTOs
+        return classrooms.stream().map(classroom -> {
+            ClassroomSummaryDTO dto = new ClassroomSummaryDTO();
+            dto.setId(classroom.getId());
+            dto.setName(classroom.getName());
+            dto.setInviteCode(classroom.getInviteCode());
+            dto.setTeacherName(classroom.getTeacher().getName());
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    public List<Course> getCoursesByClassroom(Long classroomId) {
+        // Requires a findByClassroomId method in CourseRepository
+        return courseRepository.findByClassroomId(classroomId);
+    }
+
+    public List<Question> getQuestionsByCourse(Long courseId) {
+        // Requires a findByCourseId method in QuestionRepository
+        return questionRepository.findByCourseId(courseId);
+    }
+
 }

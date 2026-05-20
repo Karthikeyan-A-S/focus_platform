@@ -8,5 +8,7 @@ import java.util.List;
 
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Long> {
+
+    // NEW: Fetch all questions belonging to a specific course
     List<Question> findByCourseId(Long courseId);
 }
