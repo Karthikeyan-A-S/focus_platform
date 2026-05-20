@@ -6,6 +6,7 @@ import com.example.focusplatform.repositories.ClassroomRepository;
 import com.example.focusplatform.repositories.CourseContentRepository;
 import com.example.focusplatform.repositories.CourseProgressRepository;
 import com.example.focusplatform.repositories.CourseRepository;
+import com.example.focusplatform.repositories.CourseSessionRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.UserRepository;
 import org.springframework.stereotype.Service;
@@ -25,19 +26,22 @@ public class StudentService {
     private final QuestionRepository questionRepository;
     private final CourseProgressRepository courseProgressRepository;
     private final CourseContentRepository contentRepository;
+    private final CourseSessionRepository courseSessionRepository;
 
     public StudentService(ClassroomRepository classroomRepository,
                           UserRepository userRepository,
                           CourseRepository courseRepository,
                           QuestionRepository questionRepository,
                           CourseProgressRepository courseProgressRepository,
-                          CourseContentRepository contentRepository) {
+                          CourseContentRepository contentRepository,
+                          CourseSessionRepository courseSessionRepository) {
         this.classroomRepository = classroomRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
         this.questionRepository = questionRepository;
         this.courseProgressRepository = courseProgressRepository;
         this.contentRepository = contentRepository;
+        this.courseSessionRepository = courseSessionRepository;
     }
 
     @Transactional
@@ -85,7 +89,27 @@ public class StudentService {
     }
 
     @Transactional
+    public long startQuizSession(String studentEmail, Long courseId) {
+        User student = userRepository.findByEmail(studentEmail)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found"));
+
+        CourseSession session = new CourseSession();
+        session.setStudent(student);
+        session.setCourse(course);
+        session.setStartTime(LocalDateTime.now());
+
+        return courseSessionRepository.save(session).getId();
+    }
+
+    @Transactional
     public String submitQuiz(String studentEmail, QuizSubmitRequest request) {
+        if (request.getCourseId() == null) {
+            throw new RuntimeException("courseId is required");
+        }
+
         User student = userRepository.findByEmail(studentEmail)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
@@ -119,8 +143,17 @@ public class StudentService {
                 Question q = questionRepository.findById(entry.getKey())
                         .orElseThrow(() -> new RuntimeException("Question not found"));
 
-                String selectedOption = entry.getValue();
-                boolean isCorrect = q.getCorrectAnswer().equalsIgnoreCase(selectedOption);
+                if (!q.getCourse().getId().equals(course.getId())) {
+                    throw new RuntimeException("Question does not belong to this course");
+                }
+
+                if (entry.getValue() == null || entry.getValue().isBlank()) {
+                    throw new RuntimeException("Missing answer for question " + entry.getKey());
+                }
+
+                String selectedOption = entry.getValue().trim();
+                boolean isCorrect = q.getCorrectAnswer() != null
+                        && q.getCorrectAnswer().trim().equalsIgnoreCase(selectedOption);
 
                 if (isCorrect) {
                     correctAnswers++;

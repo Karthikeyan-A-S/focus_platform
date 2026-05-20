@@ -24,6 +24,7 @@ public class StudentAnswer {
     // What the student actually clicked
     private String selectedOption;
 
-    // Whether it was right or wrong
-    private boolean isCorrect;
+    // Whether it was right or wrong (avoid "is*" boolean field names — Lombok/Hibernate property quirks)
+    @Column(name = "is_correct", nullable = false)
+    private boolean correct;
 }

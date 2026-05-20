@@ -49,11 +49,15 @@ public class StudentController {
         return ResponseEntity.ok(studentService.getCourseQuestions(courseId));
     }
 
+    /** @deprecated Prefer {@code POST /api/student/quiz/submit} (same contract). */
     @PostMapping("/submit")
     public ResponseEntity<String> submitQuiz(@RequestBody QuizSubmitRequest request, Authentication authentication) {
-        String studentEmail = authentication.getName();
-        String result = studentService.submitQuiz(studentEmail, request);
-        return ResponseEntity.ok(result);
+        try {
+            String result = studentService.submitQuiz(authentication.getName(), request);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
     // Add this inside your StudentController class
     @GetMapping("/my-classrooms")

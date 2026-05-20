@@ -1,7 +1,10 @@
 package com.example.focusplatform.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 import java.util.Map;
 
+@JsonDeserialize(using = QuizSubmitRequestDeserializer.class)
 public class QuizSubmitRequest {
     private Long courseId;
     // Maps the Question ID to the selected Option String

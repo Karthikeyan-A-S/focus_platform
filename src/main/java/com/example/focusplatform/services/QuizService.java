@@ -8,6 +8,7 @@ import com.example.focusplatform.repositories.CourseSessionRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.QuizResponseRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +27,7 @@ public class QuizService {
         this.questionRepository = questionRepository;
     }
 
+    @Transactional
     public boolean submitAnswer(QuizAnswerRequest request) {
         // 1. Fetch the active timer session
         CourseSession session = sessionRepository.findById(request.getSessionId())
@@ -40,6 +42,12 @@ public class QuizService {
                 .orElseThrow(() -> new RuntimeException("Question not found"));
 
         // 3. Grade the answer (ignoring upper/lower case)
+        if (request.getAnswer() == null || question.getCorrectAnswer() == null) {
+            throw new RuntimeException("Answer text is required");
+        }
+        if (!question.getCourse().getId().equals(session.getCourse().getId())) {
+            throw new RuntimeException("Question does not belong to this quiz session");
+        }
         boolean isCorrect = question.getCorrectAnswer().trim().equalsIgnoreCase(request.getAnswer().trim());
 
         // 4. Save the result to the database for analytics later
