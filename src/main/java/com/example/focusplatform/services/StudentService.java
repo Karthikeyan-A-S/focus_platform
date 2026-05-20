@@ -9,6 +9,7 @@ import com.example.focusplatform.repositories.CourseRepository;
 import com.example.focusplatform.repositories.CourseSessionRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.UserRepository;
+import com.example.focusplatform.util.QuestionOptionUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -151,9 +152,15 @@ public class StudentService {
                     throw new RuntimeException("Missing answer for question " + entry.getKey());
                 }
 
-                String selectedOption = entry.getValue().trim();
+                String selectedOption;
+                try {
+                    selectedOption = QuestionOptionUtil.normalizeSelectedOption(entry.getValue().trim());
+                } catch (IllegalArgumentException e) {
+                    throw new RuntimeException(
+                            "Invalid answer for question " + entry.getKey() + ": submit A, B, C, or D.");
+                }
                 boolean isCorrect = q.getCorrectAnswer() != null
-                        && q.getCorrectAnswer().trim().equalsIgnoreCase(selectedOption);
+                        && QuestionOptionUtil.optionsMatch(q.getCorrectAnswer(), selectedOption);
 
                 if (isCorrect) {
                     correctAnswers++;

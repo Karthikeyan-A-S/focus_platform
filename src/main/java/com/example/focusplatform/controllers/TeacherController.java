@@ -46,9 +46,13 @@ public class TeacherController {
     }
 
     @PostMapping("/questions")
-    public ResponseEntity<Question> createQuestion(@RequestBody QuestionCreateRequest request) {
-        Question question = teacherService.createQuestion(request);
-        return ResponseEntity.ok(question);
+    public ResponseEntity<?> createQuestion(@RequestBody QuestionCreateRequest request) {
+        try {
+            Question question = teacherService.createQuestion(request);
+            return ResponseEntity.ok(QuestionResponseDTO.from(question));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // ── GET Methods (Fetching Data) ─────────────────────────────────────────
@@ -66,8 +70,10 @@ public class TeacherController {
     }
 
     @GetMapping("/courses/{courseId}/questions")
-    public ResponseEntity<List<Question>> getQuestionsByCourse(@PathVariable Long courseId) {
-        List<Question> questions = teacherService.getQuestionsByCourse(courseId);
+    public ResponseEntity<List<QuestionResponseDTO>> getQuestionsByCourse(@PathVariable Long courseId) {
+        List<QuestionResponseDTO> questions = teacherService.getQuestionsByCourse(courseId).stream()
+                .map(QuestionResponseDTO::from)
+                .toList();
         return ResponseEntity.ok(questions);
     }
 
@@ -116,15 +122,23 @@ public class TeacherController {
     // -- QUESTION --
 
     @PutMapping("/questions/{id}")
-    public ResponseEntity<Question> updateQuestionFull(@PathVariable Long id, @RequestBody QuestionCreateRequest request) {
-        Question updated = teacherService.updateQuestion(id, request);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<?> updateQuestionFull(@PathVariable Long id, @RequestBody QuestionCreateRequest request) {
+        try {
+            Question updated = teacherService.updateQuestion(id, request);
+            return ResponseEntity.ok(QuestionResponseDTO.from(updated));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PatchMapping("/questions/{id}")
-    public ResponseEntity<Question> updateQuestionPartial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
-        Question updated = teacherService.patchQuestion(id, updates);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<?> updateQuestionPartial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        try {
+            Question updated = teacherService.patchQuestion(id, updates);
+            return ResponseEntity.ok(QuestionResponseDTO.from(updated));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @DeleteMapping("/questions/{id}")

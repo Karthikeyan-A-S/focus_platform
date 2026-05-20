@@ -7,6 +7,7 @@ import com.example.focusplatform.entities.QuizResponse;
 import com.example.focusplatform.repositories.CourseSessionRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.QuizResponseRepository;
+import com.example.focusplatform.util.QuestionOptionUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,13 +49,15 @@ public class QuizService {
         if (!question.getCourse().getId().equals(session.getCourse().getId())) {
             throw new RuntimeException("Question does not belong to this quiz session");
         }
-        boolean isCorrect = question.getCorrectAnswer().trim().equalsIgnoreCase(request.getAnswer().trim());
+        boolean isCorrect = QuestionOptionUtil.optionsMatch(
+                question.getCorrectAnswer(),
+                request.getAnswer());
 
         // 4. Save the result to the database for analytics later
         QuizResponse response = new QuizResponse();
         response.setSession(session);
         response.setQuestion(question);
-        response.setStudentAnswer(request.getAnswer());
+        response.setStudentAnswer(QuestionOptionUtil.normalizeSelectedOption(request.getAnswer()));
         response.setIsCorrect(isCorrect);
         response.setAttemptTimestamp(LocalDateTime.now());
 

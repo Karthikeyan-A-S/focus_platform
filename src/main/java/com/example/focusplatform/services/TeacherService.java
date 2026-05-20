@@ -11,6 +11,7 @@ import com.example.focusplatform.repositories.CourseContentRepository;
 import com.example.focusplatform.repositories.CourseRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.UserRepository;
+import com.example.focusplatform.util.QuestionOptionUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -86,7 +87,7 @@ public class TeacherService {
 
         Question question = new Question();
         question.setQuestionText(request.getQuestionText());
-        question.setCorrectAnswer(request.getCorrectAnswer());
+        question.setCorrectAnswer(normalizeCorrectOption(request.resolvedCorrectOption()));
         question.setOptions(request.getOptions());
         question.setCourse(course);
 
@@ -196,7 +197,7 @@ public class TeacherService {
 
         question.setQuestionText(request.getQuestionText());
         question.setOptions(request.getOptions());
-        question.setCorrectAnswer(request.getCorrectAnswer());
+        question.setCorrectAnswer(normalizeCorrectOption(request.resolvedCorrectOption()));
 
         return questionRepository.save(question);
     }
@@ -211,11 +212,21 @@ public class TeacherService {
         if (updates.containsKey("options")) {
             question.setOptions((String) updates.get("options"));
         }
-        if (updates.containsKey("correctAnswer")) {
-            question.setCorrectAnswer((String) updates.get("correctAnswer"));
+        if (updates.containsKey("correctOption")) {
+            question.setCorrectAnswer(normalizeCorrectOption((String) updates.get("correctOption")));
+        } else if (updates.containsKey("correctAnswer")) {
+            question.setCorrectAnswer(normalizeCorrectOption((String) updates.get("correctAnswer")));
         }
 
         return questionRepository.save(question);
+    }
+
+    private static String normalizeCorrectOption(String value) {
+        try {
+            return QuestionOptionUtil.normalizeCorrectOption(value);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(e.getMessage());
+        }
     }
 
     public void deleteQuestion(Long id) {

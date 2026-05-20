@@ -17,7 +17,7 @@ public class Question {
     @Column(columnDefinition = "TEXT")
     private String questionText;
 
-    // Keep the correct answer hidden from API responses
+    // Stored as option letter A–D; hidden from student API responses via @JsonIgnore
     @JsonIgnore
     private String correctAnswer;
 
