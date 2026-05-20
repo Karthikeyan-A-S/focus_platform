@@ -28,4 +28,6 @@ public class CourseProgress {
 
     private boolean isCompleted = false;
     private Integer quizScore;
+    @OneToMany(mappedBy = "courseProgress", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<StudentAnswer> studentAnswers = new java.util.ArrayList<>();
 }

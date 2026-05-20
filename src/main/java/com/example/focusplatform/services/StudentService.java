@@ -1,12 +1,7 @@
 package com.example.focusplatform.services;
 
 import com.example.focusplatform.dto.QuizSubmitRequest;
-import com.example.focusplatform.entities.Classroom;
-import com.example.focusplatform.entities.Course;
-import com.example.focusplatform.entities.CourseContent;
-import com.example.focusplatform.entities.CourseProgress;
-import com.example.focusplatform.entities.Question;
-import com.example.focusplatform.entities.User;
+import com.example.focusplatform.entities.*;
 import com.example.focusplatform.repositories.ClassroomRepository;
 import com.example.focusplatform.repositories.CourseContentRepository;
 import com.example.focusplatform.repositories.CourseProgressRepository;
@@ -115,7 +110,7 @@ public class StudentService {
             progress.setDurationSeconds(duration.getSeconds());
         }
 
-        // 5. Calculate Score Logic
+        // 5. Calculate Score & Record Individual Answers
         int correctAnswers = 0;
         int totalQuestions = request.getAnswers() != null ? request.getAnswers().size() : 0;
 
@@ -124,9 +119,22 @@ public class StudentService {
                 Question q = questionRepository.findById(entry.getKey())
                         .orElseThrow(() -> new RuntimeException("Question not found"));
 
-                if (q.getCorrectAnswer().equalsIgnoreCase(entry.getValue())) {
+                String selectedOption = entry.getValue();
+                boolean isCorrect = q.getCorrectAnswer().equalsIgnoreCase(selectedOption);
+
+                if (isCorrect) {
                     correctAnswers++;
                 }
+
+                // --- NEW: Save the specific answer to the database! ---
+                StudentAnswer answerRecord = new StudentAnswer();
+                answerRecord.setCourseProgress(progress);
+                answerRecord.setQuestion(q);
+                answerRecord.setSelectedOption(selectedOption);
+                answerRecord.setCorrect(isCorrect);
+
+                // Add it to the progress list
+                progress.getStudentAnswers().add(answerRecord);
             }
         }
 
@@ -135,7 +143,7 @@ public class StudentService {
         progress.setQuizScore(score);
         progress.setCompleted(true);
 
-        // 6. Save the updated progress
+        // 6. Save the updated progress (Because of CascadeType.ALL, this automatically saves all the StudentAnswers too!)
         courseProgressRepository.save(progress);
 
         return "Quiz submitted! You took " + progress.getDurationSeconds() + " seconds and scored " + score + "%";
