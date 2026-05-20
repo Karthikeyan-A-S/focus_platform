@@ -69,6 +69,23 @@ public class TeacherController {
         return ResponseEntity.ok(courses);
     }
 
+    /** Full student profiles for a classroom (not IDs only). */
+    @GetMapping("/classrooms/{classroomId}/students")
+    public ResponseEntity<List<StudentSummaryDTO>> getClassroomStudents(
+            @PathVariable Long classroomId,
+            Principal principal) {
+        return ResponseEntity.ok(teacherService.getClassroomStudents(principal.getName(), classroomId));
+    }
+
+    @DeleteMapping("/classrooms/{classroomId}/students/{studentId}")
+    public ResponseEntity<Void> removeStudentFromClassroom(
+            @PathVariable Long classroomId,
+            @PathVariable Long studentId,
+            Principal principal) {
+        teacherService.removeStudentFromClassroom(principal.getName(), classroomId, studentId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/courses/{courseId}/questions")
     public ResponseEntity<List<QuestionResponseDTO>> getQuestionsByCourse(@PathVariable Long courseId) {
         List<QuestionResponseDTO> questions = teacherService.getQuestionsByCourse(courseId).stream()

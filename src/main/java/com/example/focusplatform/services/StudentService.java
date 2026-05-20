@@ -28,6 +28,7 @@ public class StudentService {
     private final CourseProgressRepository courseProgressRepository;
     private final CourseContentRepository contentRepository;
     private final CourseSessionRepository courseSessionRepository;
+    private final AttemptRecordingService attemptRecordingService;
 
     public StudentService(ClassroomRepository classroomRepository,
                           UserRepository userRepository,
@@ -35,7 +36,8 @@ public class StudentService {
                           QuestionRepository questionRepository,
                           CourseProgressRepository courseProgressRepository,
                           CourseContentRepository contentRepository,
-                          CourseSessionRepository courseSessionRepository) {
+                          CourseSessionRepository courseSessionRepository,
+                          AttemptRecordingService attemptRecordingService) {
         this.classroomRepository = classroomRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
@@ -43,6 +45,7 @@ public class StudentService {
         this.courseProgressRepository = courseProgressRepository;
         this.contentRepository = contentRepository;
         this.courseSessionRepository = courseSessionRepository;
+        this.attemptRecordingService = attemptRecordingService;
     }
 
     @Transactional
@@ -139,6 +142,11 @@ public class StudentService {
         int correctAnswers = 0;
         int totalQuestions = request.getAnswers() != null ? request.getAnswers().size() : 0;
 
+        long perQuestionMs = 0L;
+        if (totalQuestions > 0 && progress.getDurationSeconds() != null && progress.getDurationSeconds() > 0) {
+            perQuestionMs = (progress.getDurationSeconds() * 1000L) / totalQuestions;
+        }
+
         if (totalQuestions > 0) {
             for (Map.Entry<Long, String> entry : request.getAnswers().entrySet()) {
                 Question q = questionRepository.findById(entry.getKey())
@@ -175,6 +183,8 @@ public class StudentService {
 
                 // Add it to the progress list
                 progress.getStudentAnswers().add(answerRecord);
+
+                attemptRecordingService.recordAttempt(student, course, q, isCorrect, perQuestionMs);
             }
         }
 

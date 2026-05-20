@@ -44,7 +44,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll() // <--- ADD THIS EXACT LINE
                         .requestMatchers("/api/teacher/**").hasAuthority("TEACHER")
-                        .requestMatchers("/api/student/**", "/api/analytics/**").hasAuthority("STUDENT")
+                        .requestMatchers("/api/analytics/student").hasAuthority("STUDENT")
+                        .requestMatchers("/api/analytics/teacher/**").hasAuthority("TEACHER")
+                        .requestMatchers("/api/analytics/leaderboard/**").authenticated()
+                        .requestMatchers("/api/student/**").hasAuthority("STUDENT")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

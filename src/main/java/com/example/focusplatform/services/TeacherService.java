@@ -2,6 +2,8 @@ package com.example.focusplatform.services;
 
 import com.example.focusplatform.dto.*;
 import com.example.focusplatform.entities.Classroom;
+import com.example.focusplatform.exception.AccessDeniedException;
+import com.example.focusplatform.exception.ResourceNotFoundException;
 import com.example.focusplatform.entities.Course;
 import com.example.focusplatform.entities.CourseContent;
 import com.example.focusplatform.entities.Question;
@@ -14,6 +16,7 @@ import com.example.focusplatform.repositories.UserRepository;
 import com.example.focusplatform.util.QuestionOptionUtil;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -121,6 +124,41 @@ public class TeacherService {
 
     public List<Question> getQuestionsByCourse(Long courseId) {
         return questionRepository.findByCourseId(courseId);
+    }
+
+    public List<StudentSummaryDTO> getClassroomStudents(String teacherEmail, Long classroomId) {
+        Classroom classroom = requireTeacherClassroom(teacherEmail, classroomId);
+        if (classroom.getStudents() == null || classroom.getStudents().isEmpty()) {
+            return List.of();
+        }
+        return classroom.getStudents().stream()
+                .sorted(Comparator.comparing(User::getName, Comparator.nullsLast(String::compareToIgnoreCase)))
+                .map(StudentSummaryDTO::from)
+                .collect(Collectors.toList());
+    }
+
+    public void removeStudentFromClassroom(String teacherEmail, Long classroomId, Long studentId) {
+        Classroom classroom = requireTeacherClassroom(teacherEmail, classroomId);
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        if (classroom.getStudents() == null || !classroom.getStudents().removeIf(s -> s.getId().equals(studentId))) {
+            throw new ResourceNotFoundException("Student is not enrolled in this classroom");
+        }
+        classroomRepository.save(classroom);
+    }
+
+    private Classroom requireTeacherClassroom(String teacherEmail, Long classroomId) {
+        User teacher = userRepository.findByEmail(teacherEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found"));
+
+        Classroom classroom = classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found"));
+
+        if (classroom.getTeacher() == null || !classroom.getTeacher().getId().equals(teacher.getId())) {
+            throw new AccessDeniedException("You do not own this classroom");
+        }
+        return classroom;
     }
 
     // ==========================================

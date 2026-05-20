@@ -11,6 +11,7 @@ import com.example.focusplatform.util.QuestionOptionUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
@@ -19,13 +20,16 @@ public class QuizService {
     private final QuizResponseRepository quizResponseRepository;
     private final CourseSessionRepository sessionRepository;
     private final QuestionRepository questionRepository;
+    private final AttemptRecordingService attemptRecordingService;
 
     public QuizService(QuizResponseRepository quizResponseRepository,
                        CourseSessionRepository sessionRepository,
-                       QuestionRepository questionRepository) {
+                       QuestionRepository questionRepository,
+                       AttemptRecordingService attemptRecordingService) {
         this.quizResponseRepository = quizResponseRepository;
         this.sessionRepository = sessionRepository;
         this.questionRepository = questionRepository;
+        this.attemptRecordingService = attemptRecordingService;
     }
 
     @Transactional
@@ -53,15 +57,28 @@ public class QuizService {
                 question.getCorrectAnswer(),
                 request.getAnswer());
 
-        // 4. Save the result to the database for analytics later
+        LocalDateTime answeredAt = LocalDateTime.now();
+        LocalDateTime from = quizResponseRepository
+                .findTopBySessionIdOrderByAttemptTimestampDesc(session.getId())
+                .map(QuizResponse::getAttemptTimestamp)
+                .orElse(session.getStartTime());
+        long timeTakenMs = Duration.between(from, answeredAt).toMillis();
+
         QuizResponse response = new QuizResponse();
         response.setSession(session);
         response.setQuestion(question);
         response.setStudentAnswer(QuestionOptionUtil.normalizeSelectedOption(request.getAnswer()));
         response.setIsCorrect(isCorrect);
-        response.setAttemptTimestamp(LocalDateTime.now());
+        response.setAttemptTimestamp(answeredAt);
 
         quizResponseRepository.save(response);
+
+        attemptRecordingService.recordAttempt(
+                session.getStudent(),
+                session.getCourse(),
+                question,
+                isCorrect,
+                timeTakenMs);
 
         return isCorrect;
     }
