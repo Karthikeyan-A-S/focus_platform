@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/teacher")
@@ -52,24 +53,83 @@ public class TeacherController {
 
     // ── GET Methods (Fetching Data) ─────────────────────────────────────────
 
-    // Fetch all classrooms belonging to the logged-in teacher
     @GetMapping("/classrooms")
     public ResponseEntity<List<ClassroomSummaryDTO>> getTeacherClassrooms(Principal principal) {
         List<ClassroomSummaryDTO> classrooms = teacherService.getClassroomsByTeacher(principal.getName());
         return ResponseEntity.ok(classrooms);
     }
 
-    // Fetch all courses for a specific classroom
     @GetMapping("/classrooms/{classroomId}/courses")
     public ResponseEntity<List<Course>> getCoursesByClassroom(@PathVariable Long classroomId) {
         List<Course> courses = teacherService.getCoursesByClassroom(classroomId);
         return ResponseEntity.ok(courses);
     }
 
-    // Fetch all questions for a specific course
     @GetMapping("/courses/{courseId}/questions")
     public ResponseEntity<List<Question>> getQuestionsByCourse(@PathVariable Long courseId) {
         List<Question> questions = teacherService.getQuestionsByCourse(courseId);
         return ResponseEntity.ok(questions);
+    }
+
+    // ── PUT / PATCH / DELETE Methods (Updating & Deleting) ──────────────────
+
+    // -- CLASSROOM --
+
+    @PutMapping("/classrooms/{id}")
+    public ResponseEntity<Classroom> updateClassroomFull(@PathVariable Long id, @RequestBody ClassroomCreateRequest request) {
+        Classroom updated = teacherService.updateClassroom(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PatchMapping("/classrooms/{id}")
+    public ResponseEntity<Classroom> updateClassroomPartial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        Classroom updated = teacherService.patchClassroom(id, updates);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/classrooms/{id}")
+    public ResponseEntity<Void> deleteClassroom(@PathVariable Long id) {
+        teacherService.deleteClassroom(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // -- COURSE --
+
+    @PutMapping("/courses/{id}")
+    public ResponseEntity<Course> updateCourseFull(@PathVariable Long id, @RequestBody CourseCreateRequest request) {
+        Course updated = teacherService.updateCourse(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PatchMapping("/courses/{id}")
+    public ResponseEntity<Course> updateCoursePartial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        Course updated = teacherService.patchCourse(id, updates);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/courses/{id}")
+    public ResponseEntity<Void> deleteCourse(@PathVariable Long id) {
+        teacherService.deleteCourse(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // -- QUESTION --
+
+    @PutMapping("/questions/{id}")
+    public ResponseEntity<Question> updateQuestionFull(@PathVariable Long id, @RequestBody QuestionCreateRequest request) {
+        Question updated = teacherService.updateQuestion(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PatchMapping("/questions/{id}")
+    public ResponseEntity<Question> updateQuestionPartial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        Question updated = teacherService.patchQuestion(id, updates);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/questions/{id}")
+    public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
+        teacherService.deleteQuestion(id);
+        return ResponseEntity.noContent().build();
     }
 }

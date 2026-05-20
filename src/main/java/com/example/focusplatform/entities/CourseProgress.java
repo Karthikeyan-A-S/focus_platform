@@ -2,9 +2,9 @@ package com.example.focusplatform.entities;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "course_progress")
 @Data
 public class CourseProgress {
 
@@ -13,11 +13,19 @@ public class CourseProgress {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "student_id")
     private User student;
 
     @ManyToOne
+    @JoinColumn(name = "course_id")
     private Course course;
 
-    private Double score;
-    private boolean isCompleted;
+    private LocalDateTime startedAt;
+
+    // --- NEW FIELDS ---
+    private LocalDateTime submittedAt;
+    private Long durationSeconds;
+
+    private boolean isCompleted = false;
+    private Integer quizScore;
 }

@@ -16,4 +16,5 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
 
     // NEW: For teachers viewing their dashboard
     List<Classroom> findByTeacher(User teacher);
+    List<Classroom> findByStudentsContaining(User student);
 }

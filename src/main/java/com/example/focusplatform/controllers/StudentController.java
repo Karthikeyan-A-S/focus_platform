@@ -29,13 +29,21 @@ public class StudentController {
         return ResponseEntity.ok("Successfully enrolled in classroom: " + classroom.getName());
     }
 
-    // --- NEW: Fetch Course Content ---
+    // --- Track when a student starts the course ---
+    @PostMapping("/courses/{courseId}/start")
+    public ResponseEntity<String> startCourse(@PathVariable Long courseId, Authentication authentication) {
+        String studentEmail = authentication.getName();
+        studentService.markCourseAsStarted(studentEmail, courseId);
+        return ResponseEntity.ok("Course started. Time recorded!");
+    }
+
+    // Fetch Course Content
     @GetMapping("/courses/{courseId}/content")
     public ResponseEntity<List<CourseContent>> getCourseContent(@PathVariable Long courseId) {
         return ResponseEntity.ok(studentService.getCourseContent(courseId));
     }
 
-    // --- NEW: Fetch Quiz Questions ---
+    // Fetch Quiz Questions
     @GetMapping("/courses/{courseId}/questions")
     public ResponseEntity<List<Question>> getCourseQuestions(@PathVariable Long courseId) {
         return ResponseEntity.ok(studentService.getCourseQuestions(courseId));
@@ -46,5 +54,10 @@ public class StudentController {
         String studentEmail = authentication.getName();
         String result = studentService.submitQuiz(studentEmail, request);
         return ResponseEntity.ok(result);
+    }
+    // Add this inside your StudentController class
+    @GetMapping("/my-classrooms")
+    public ResponseEntity<List<Classroom>> getMyClassrooms(Authentication authentication) {
+        return ResponseEntity.ok(studentService.getMyClassrooms(authentication.getName()));
     }
 }
