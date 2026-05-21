@@ -132,7 +132,7 @@ public class TeacherService {
             dto.setInviteCode(classroom.getInviteCode());
             dto.setTeacherName(classroom.getTeacher().getName());
             return dto;
-        }).collect(Collectors.toList());
+        }).toList(); // Replaced collect(Collectors.toList())
     }
 
     public List<Course> getCoursesByClassroom(Long classroomId) {
@@ -151,7 +151,7 @@ public class TeacherService {
         return classroom.getStudents().stream()
                 .sorted(Comparator.comparing(User::getName, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .map(StudentSummaryDTO::from)
-                .collect(Collectors.toList());
+                .toList(); // Replaced collect(Collectors.toList())
     }
 
     public void removeStudentFromClassroom(String teacherEmail, Long classroomId, Long studentId) {
@@ -201,11 +201,6 @@ public class TeacherService {
         return courseRepository.save(course);
     }
 
-    /**
-     * Deletes a course and all its child data in safe FK order:
-     *   StudentAnswer → QuizResponse → UserQuestionAttempt
-     *   → CourseSession → CourseProgress → CourseContent → Question → Course
-     */
     @Transactional
     public void deleteCourse(Long id) {
         if (!courseRepository.existsById(id)) {
@@ -236,27 +231,20 @@ public class TeacherService {
         return classroomRepository.save(classroom);
     }
 
-    /**
-     * Deletes a classroom and all its courses/child data in safe FK order.
-     * Also clears the student enrolment join table.
-     */
     @Transactional
     public void deleteClassroom(Long id) {
         Classroom classroom = classroomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Classroom not found"));
 
-        // 1. Wipe every course belonging to this classroom
         List<Course> courses = courseRepository.findByClassroomId(id);
         for (Course course : courses) {
             deleteCourseData(course.getId());
         }
         courseRepository.deleteAll(courses);
 
-        // 2. Clear the student ↔ classroom join table so no orphan rows remain
         classroom.getStudents().clear();
         classroomRepository.save(classroom);
 
-        // 3. Now safe to delete the classroom itself
         classroomRepository.deleteById(id);
     }
 
@@ -290,10 +278,6 @@ public class TeacherService {
         return questionRepository.save(question);
     }
 
-    /**
-     * Deletes a question and all its child data in safe FK order:
-     *   StudentAnswer → QuizResponse → UserQuestionAttempt → Question
-     */
     @Transactional
     public void deleteQuestion(Long id) {
         if (!questionRepository.existsById(id)) {
@@ -304,82 +288,58 @@ public class TeacherService {
     }
 
     // ==========================================
+    // UPDATE & DELETE: CONTENT
+    // ==========================================
+
+    public CourseContent updateContent(Long contentId, ContentCreateRequest request) {
+        // FIX: Replaced CourseContentRepository with the injected contentRepository variable
+        CourseContent content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new RuntimeException("Content not found with id: " + contentId));
+
+        content.setBodyText(request.getBodyText());
+        return contentRepository.save(content);
+    }
+
+    public void deleteContent(Long contentId) {
+        // FIX: Replaced courseContentRepository with the injected contentRepository variable
+        if (!contentRepository.existsById(contentId)) {
+            throw new RuntimeException("Content not found with id: " + contentId);
+        }
+        contentRepository.deleteById(contentId);
+    }
+
+    // ==========================================
     // PRIVATE HELPERS — cascading delete logic
     // ==========================================
 
-    /**
-     * Deletes all child records for ONE question before the question itself is removed.
-     * Call this before questionRepository.deleteById().
-     */
     private void deleteQuestionData(Long questionId) {
-        // StudentAnswer references both CourseProgress AND Question.
-        // Must go first so the Question FK is free.
         studentAnswerRepository_deleteByQuestionId(questionId);
-
-        // QuizResponse references Question (and CourseSession).
         quizResponseRepository.deleteByQuestionId(questionId);
-
-        // Attempt records reference Question directly.
         attemptRepository.deleteByQuestionId(questionId);
     }
 
-    /**
-     * Deletes all child records for ONE course before the course itself is removed.
-     * Does NOT delete the Course row — caller does that.
-     */
     private void deleteCourseData(Long courseId) {
-        // Gather question IDs for this course so we can nuke per-question children first.
         List<Long> questionIds = questionRepository.findByCourseId(courseId)
-                .stream().map(Question::getId).collect(Collectors.toList());
+                .stream().map(Question::getId).toList();
 
         for (Long qid : questionIds) {
-            // StudentAnswer and QuizResponse reference the question — clear those first.
             studentAnswerRepository_deleteByQuestionId(qid);
             quizResponseRepository.deleteByQuestionId(qid);
         }
 
-        // Now wipe the session-level quiz responses (covers any not linked to a specific question).
         quizResponseRepository.deleteBySessionCourseId(courseId);
-
-        // Attempt records are per-course as well.
         attemptRepository.deleteByCourseId(courseId);
-
-        // CourseSession (timed quiz sessions).
         courseSessionRepository.deleteByCourseId(courseId);
-
-        // CourseProgress — CascadeType.ALL means deleting progress also removes StudentAnswer rows
-        // that weren't already caught above (edge-case safety net).
         courseProgressRepository.deleteByCourseId(courseId);
-
-        // Static content blocks.
         contentRepository.deleteByCourseId(courseId);
-
-        // Finally, the question rows themselves.
         questionRepository.deleteByCourseId(courseId);
     }
 
-    /**
+    /*
      * Inline shim for StudentAnswer deletion.
-     *
-     * Add this method to a StudentAnswerRepository interface you create:
-     *
-     *   @Modifying
-     *   @Transactional
-     *   @Query("DELETE FROM StudentAnswer sa WHERE sa.question.id = :questionId")
-     *   void deleteByQuestionId(@Param("questionId") Long questionId);
-     *
-     * Then inject StudentAnswerRepository here and replace this method body
-     * with:  studentAnswerRepository.deleteByQuestionId(questionId);
-     *
-     * If StudentAnswer is always cascade-deleted from CourseProgress, you can
-     * delete this shim entirely — but explicit deletion is safer.
+     * Changed from /** to /* to avoid IDE parsing warnings for nested annotations.
      */
     private void studentAnswerRepository_deleteByQuestionId(Long questionId) {
-        // Implemented via courseProgressRepository JPQL or a dedicated StudentAnswerRepository.
-        // The call is a no-op placeholder until you wire up the repo — CourseProgress cascade
-        // handles cleanup when deleteByCourse_Id runs later in deleteCourseData().
-        //
-        // For QUESTION-only deletes, add the StudentAnswerRepository and call it here.
         courseProgressRepository.deleteStudentAnswersByQuestionId(questionId);
     }
 

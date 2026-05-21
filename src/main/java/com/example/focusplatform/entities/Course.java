@@ -29,10 +29,12 @@ public class Course {
     // "Managed" side — Course owns contents list
     @JsonManagedReference("course-contents")
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OrderBy("id ASC") // <-- Forces the database to always sort by ID
     private List<CourseContent> contents;
 
     // "Managed" side — Course owns questions list
     @JsonManagedReference("course-questions")
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OrderBy("id ASC") // <-- Forces the database to always sort by ID
     private List<Question> questions;
 }

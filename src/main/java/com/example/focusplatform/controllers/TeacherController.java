@@ -163,4 +163,17 @@ public class TeacherController {
         teacherService.deleteQuestion(id);
         return ResponseEntity.noContent().build();
     }
+    // -- CONTENT --
+
+    @PutMapping("/content/{id}")
+    public ResponseEntity<CourseContent> updateContent(@PathVariable Long id, @RequestBody ContentCreateRequest request) {
+        CourseContent updated = teacherService.updateContent(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/content/{id}")
+    public ResponseEntity<Void> deleteContent(@PathVariable Long id) {
+        teacherService.deleteContent(id);
+        return ResponseEntity.noContent().build();
+    }
 }
