@@ -176,4 +176,22 @@ public class TeacherController {
         teacherService.deleteContent(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/students/search")
+    public ResponseEntity<List<StudentSummaryDTO>> searchStudents(@RequestParam String query) {
+        // Prevent searching if the query is too short
+        if (query == null || query.trim().length() < 2) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(teacherService.searchStudents(query));
+    }
+
+    @PostMapping("/classrooms/{classroomId}/students/{studentId}")
+    public ResponseEntity<Void> addStudentToClassroom(
+            @PathVariable Long classroomId,
+            @PathVariable Long studentId,
+            Principal principal) {
+        teacherService.addStudentToClassroom(principal.getName(), classroomId, studentId);
+        return ResponseEntity.ok().build();
+    }
 }

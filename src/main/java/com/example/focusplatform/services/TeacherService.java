@@ -1,13 +1,9 @@
 package com.example.focusplatform.services;
 
 import com.example.focusplatform.dto.*;
-import com.example.focusplatform.entities.Classroom;
+import com.example.focusplatform.entities.*;
 import com.example.focusplatform.exception.AccessDeniedException;
 import com.example.focusplatform.exception.ResourceNotFoundException;
-import com.example.focusplatform.entities.Course;
-import com.example.focusplatform.entities.CourseContent;
-import com.example.focusplatform.entities.Question;
-import com.example.focusplatform.entities.User;
 import com.example.focusplatform.repositories.ClassroomRepository;
 import com.example.focusplatform.repositories.CourseContentRepository;
 import com.example.focusplatform.repositories.CourseProgressRepository;
@@ -348,6 +344,27 @@ public class TeacherService {
             return QuestionOptionUtil.normalizeCorrectOption(value);
         } catch (IllegalArgumentException e) {
             throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    // Search for students by name for the autocomplete dropdown
+    public List<StudentSummaryDTO> searchStudents(String query) {
+        return userRepository.findByNameContainingIgnoreCaseAndRole(query, Role.STUDENT)
+                .stream()
+                .map(StudentSummaryDTO::from)
+                .toList();
+    }
+
+    // Add a specific student to the classroom
+    public void addStudentToClassroom(String teacherEmail, Long classroomId, Long studentId) {
+        Classroom classroom = requireTeacherClassroom(teacherEmail, classroomId);
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        // Only add them if they aren't already in the classroom
+        if (!classroom.getStudents().contains(student)) {
+            classroom.getStudents().add(student);
+            classroomRepository.save(classroom);
         }
     }
 }
