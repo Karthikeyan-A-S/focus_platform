@@ -5,9 +5,11 @@ import com.example.focusplatform.repository.projection.CourseBreakdownProjection
 import com.example.focusplatform.repository.projection.StudentCourseAggregateProjection;
 import com.example.focusplatform.repository.projection.StudentOverallAggregateProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -56,4 +58,12 @@ public interface UserQuestionAttemptRepository extends JpaRepository<UserQuestio
             GROUP BY a.student.id, a.student.name, a.student.email
             """)
     List<StudentCourseAggregateProjection> aggregateByCourse(@Param("courseId") Long courseId);
+
+    @Modifying
+    @Transactional
+    void deleteByQuestionId(Long questionId);
+
+    @Modifying
+    @Transactional
+    void deleteByCourseId(Long courseId);
 }

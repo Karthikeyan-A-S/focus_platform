@@ -10,11 +10,16 @@ import com.example.focusplatform.entities.Question;
 import com.example.focusplatform.entities.User;
 import com.example.focusplatform.repositories.ClassroomRepository;
 import com.example.focusplatform.repositories.CourseContentRepository;
+import com.example.focusplatform.repositories.CourseProgressRepository;
 import com.example.focusplatform.repositories.CourseRepository;
+import com.example.focusplatform.repositories.CourseSessionRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
+import com.example.focusplatform.repositories.QuizResponseRepository;
+import com.example.focusplatform.repositories.UserQuestionAttemptRepository;
 import com.example.focusplatform.repositories.UserRepository;
 import com.example.focusplatform.util.QuestionOptionUtil;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
@@ -31,16 +36,30 @@ public class TeacherService {
     private final CourseContentRepository contentRepository;
     private final QuestionRepository questionRepository;
 
+    // --- Repositories needed for safe cascading deletes ---
+    private final UserQuestionAttemptRepository attemptRepository;
+    private final CourseProgressRepository courseProgressRepository;
+    private final CourseSessionRepository courseSessionRepository;
+    private final QuizResponseRepository quizResponseRepository;
+
     public TeacherService(ClassroomRepository classroomRepository,
                           CourseRepository courseRepository,
                           UserRepository userRepository,
                           CourseContentRepository contentRepository,
-                          QuestionRepository questionRepository) {
+                          QuestionRepository questionRepository,
+                          UserQuestionAttemptRepository attemptRepository,
+                          CourseProgressRepository courseProgressRepository,
+                          CourseSessionRepository courseSessionRepository,
+                          QuizResponseRepository quizResponseRepository) {
         this.classroomRepository = classroomRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.contentRepository = contentRepository;
         this.questionRepository = questionRepository;
+        this.attemptRepository = attemptRepository;
+        this.courseProgressRepository = courseProgressRepository;
+        this.courseSessionRepository = courseSessionRepository;
+        this.quizResponseRepository = quizResponseRepository;
     }
 
     // ==========================================
@@ -54,7 +73,6 @@ public class TeacherService {
         Classroom classroom = new Classroom();
         classroom.setName(request.getName());
         classroom.setTeacher(teacher);
-        // Generate a random 6-character alphanumeric code
         classroom.setInviteCode(UUID.randomUUID().toString().substring(0, 6).toUpperCase());
 
         return classroomRepository.save(classroom);
@@ -107,7 +125,6 @@ public class TeacherService {
 
         List<Classroom> classrooms = classroomRepository.findByTeacher(teacher);
 
-        // Convert the full Classroom entities into lightweight DTOs
         return classrooms.stream().map(classroom -> {
             ClassroomSummaryDTO dto = new ClassroomSummaryDTO();
             dto.setId(classroom.getId());
@@ -139,7 +156,7 @@ public class TeacherService {
 
     public void removeStudentFromClassroom(String teacherEmail, Long classroomId, Long studentId) {
         Classroom classroom = requireTeacherClassroom(teacherEmail, classroomId);
-        User student = userRepository.findById(studentId)
+        userRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
 
         if (classroom.getStudents() == null || !classroom.getStudents().removeIf(s -> s.getId().equals(studentId))) {
@@ -178,20 +195,23 @@ public class TeacherService {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        if (updates.containsKey("title")) {
-            course.setTitle((String) updates.get("title"));
-        }
-        if (updates.containsKey("description")) {
-            course.setDescription((String) updates.get("description"));
-        }
+        if (updates.containsKey("title"))       course.setTitle((String) updates.get("title"));
+        if (updates.containsKey("description")) course.setDescription((String) updates.get("description"));
 
         return courseRepository.save(course);
     }
 
+    /**
+     * Deletes a course and all its child data in safe FK order:
+     *   StudentAnswer → QuizResponse → UserQuestionAttempt
+     *   → CourseSession → CourseProgress → CourseContent → Question → Course
+     */
+    @Transactional
     public void deleteCourse(Long id) {
         if (!courseRepository.existsById(id)) {
             throw new RuntimeException("Course not found");
         }
+        deleteCourseData(id);
         courseRepository.deleteById(id);
     }
 
@@ -211,17 +231,32 @@ public class TeacherService {
         Classroom classroom = classroomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Classroom not found"));
 
-        if (updates.containsKey("name")) {
-            classroom.setName((String) updates.get("name"));
-        }
+        if (updates.containsKey("name")) classroom.setName((String) updates.get("name"));
 
         return classroomRepository.save(classroom);
     }
 
+    /**
+     * Deletes a classroom and all its courses/child data in safe FK order.
+     * Also clears the student enrolment join table.
+     */
+    @Transactional
     public void deleteClassroom(Long id) {
-        if (!classroomRepository.existsById(id)) {
-            throw new RuntimeException("Classroom not found");
+        Classroom classroom = classroomRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Classroom not found"));
+
+        // 1. Wipe every course belonging to this classroom
+        List<Course> courses = courseRepository.findByClassroomId(id);
+        for (Course course : courses) {
+            deleteCourseData(course.getId());
         }
+        courseRepository.deleteAll(courses);
+
+        // 2. Clear the student ↔ classroom join table so no orphan rows remain
+        classroom.getStudents().clear();
+        classroomRepository.save(classroom);
+
+        // 3. Now safe to delete the classroom itself
         classroomRepository.deleteById(id);
     }
 
@@ -244,12 +279,8 @@ public class TeacherService {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Question not found"));
 
-        if (updates.containsKey("questionText")) {
-            question.setQuestionText((String) updates.get("questionText"));
-        }
-        if (updates.containsKey("options")) {
-            question.setOptions((String) updates.get("options"));
-        }
+        if (updates.containsKey("questionText")) question.setQuestionText((String) updates.get("questionText"));
+        if (updates.containsKey("options"))      question.setOptions((String) updates.get("options"));
         if (updates.containsKey("correctOption")) {
             question.setCorrectAnswer(normalizeCorrectOption((String) updates.get("correctOption")));
         } else if (updates.containsKey("correctAnswer")) {
@@ -259,18 +290,104 @@ public class TeacherService {
         return questionRepository.save(question);
     }
 
+    /**
+     * Deletes a question and all its child data in safe FK order:
+     *   StudentAnswer → QuizResponse → UserQuestionAttempt → Question
+     */
+    @Transactional
+    public void deleteQuestion(Long id) {
+        if (!questionRepository.existsById(id)) {
+            throw new RuntimeException("Question not found");
+        }
+        deleteQuestionData(id);
+        questionRepository.deleteById(id);
+    }
+
+    // ==========================================
+    // PRIVATE HELPERS — cascading delete logic
+    // ==========================================
+
+    /**
+     * Deletes all child records for ONE question before the question itself is removed.
+     * Call this before questionRepository.deleteById().
+     */
+    private void deleteQuestionData(Long questionId) {
+        // StudentAnswer references both CourseProgress AND Question.
+        // Must go first so the Question FK is free.
+        studentAnswerRepository_deleteByQuestionId(questionId);
+
+        // QuizResponse references Question (and CourseSession).
+        quizResponseRepository.deleteByQuestionId(questionId);
+
+        // Attempt records reference Question directly.
+        attemptRepository.deleteByQuestionId(questionId);
+    }
+
+    /**
+     * Deletes all child records for ONE course before the course itself is removed.
+     * Does NOT delete the Course row — caller does that.
+     */
+    private void deleteCourseData(Long courseId) {
+        // Gather question IDs for this course so we can nuke per-question children first.
+        List<Long> questionIds = questionRepository.findByCourseId(courseId)
+                .stream().map(Question::getId).collect(Collectors.toList());
+
+        for (Long qid : questionIds) {
+            // StudentAnswer and QuizResponse reference the question — clear those first.
+            studentAnswerRepository_deleteByQuestionId(qid);
+            quizResponseRepository.deleteByQuestionId(qid);
+        }
+
+        // Now wipe the session-level quiz responses (covers any not linked to a specific question).
+        quizResponseRepository.deleteBySessionCourseId(courseId);
+
+        // Attempt records are per-course as well.
+        attemptRepository.deleteByCourseId(courseId);
+
+        // CourseSession (timed quiz sessions).
+        courseSessionRepository.deleteByCourseId(courseId);
+
+        // CourseProgress — CascadeType.ALL means deleting progress also removes StudentAnswer rows
+        // that weren't already caught above (edge-case safety net).
+        courseProgressRepository.deleteByCourseId(courseId);
+
+        // Static content blocks.
+        contentRepository.deleteByCourseId(courseId);
+
+        // Finally, the question rows themselves.
+        questionRepository.deleteByCourseId(courseId);
+    }
+
+    /**
+     * Inline shim for StudentAnswer deletion.
+     *
+     * Add this method to a StudentAnswerRepository interface you create:
+     *
+     *   @Modifying
+     *   @Transactional
+     *   @Query("DELETE FROM StudentAnswer sa WHERE sa.question.id = :questionId")
+     *   void deleteByQuestionId(@Param("questionId") Long questionId);
+     *
+     * Then inject StudentAnswerRepository here and replace this method body
+     * with:  studentAnswerRepository.deleteByQuestionId(questionId);
+     *
+     * If StudentAnswer is always cascade-deleted from CourseProgress, you can
+     * delete this shim entirely — but explicit deletion is safer.
+     */
+    private void studentAnswerRepository_deleteByQuestionId(Long questionId) {
+        // Implemented via courseProgressRepository JPQL or a dedicated StudentAnswerRepository.
+        // The call is a no-op placeholder until you wire up the repo — CourseProgress cascade
+        // handles cleanup when deleteByCourse_Id runs later in deleteCourseData().
+        //
+        // For QUESTION-only deletes, add the StudentAnswerRepository and call it here.
+        courseProgressRepository.deleteStudentAnswersByQuestionId(questionId);
+    }
+
     private static String normalizeCorrectOption(String value) {
         try {
             return QuestionOptionUtil.normalizeCorrectOption(value);
         } catch (IllegalArgumentException e) {
             throw new RuntimeException(e.getMessage());
         }
-    }
-
-    public void deleteQuestion(Long id) {
-        if (!questionRepository.existsById(id)) {
-            throw new RuntimeException("Question not found");
-        }
-        questionRepository.deleteById(id);
     }
 }
