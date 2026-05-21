@@ -188,13 +188,18 @@ public class AnalyticsService {
     }
 
     /**
-     * Rank: more questions attempted first, then faster total time, then more correct answers.
+     * Rank: Highest correct answers first, then fastest total time, then most questions attempted.
      */
     private Comparator<TeacherCourseStatsResponse.StudentCourseStatEntry> leaderboardComparator() {
         return Comparator
-                .comparingLong(TeacherCourseStatsResponse.StudentCourseStatEntry::getQuestionsAttempted).reversed()
-                .thenComparingLong(TeacherCourseStatsResponse.StudentCourseStatEntry::getTotalTimeMs)
-                .thenComparingLong(TeacherCourseStatsResponse.StudentCourseStatEntry::getCorrectCount).reversed();
+                // 1st Priority: Highest Correct Answers wins (Descending)
+                .comparingLong(TeacherCourseStatsResponse.StudentCourseStatEntry::getCorrectCount)
+
+                // 2nd Priority: Lowest Time wins ties (Ascending)
+                .thenComparingLong(TeacherCourseStatsResponse.StudentCourseStatEntry::getTotalTimeMs).reversed()
+
+                // 3rd Priority: Most Questions Attempted wins ties (Descending)
+                .thenComparingLong(TeacherCourseStatsResponse.StudentCourseStatEntry::getQuestionsAttempted);
     }
 
     private void assertTeacherOwnsCourse(String teacherEmail, Course course) {
