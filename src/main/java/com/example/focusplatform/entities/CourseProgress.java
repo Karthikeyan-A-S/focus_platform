@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Data
-public class CourseProgress {
+public class    CourseProgress {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -4,34 +4,37 @@ import com.example.focusplatform.dto.AuthResponse;
 import com.example.focusplatform.dto.LoginRequest;
 import com.example.focusplatform.dto.RegisterRequest;
 import com.example.focusplatform.services.AuthService;
+import com.example.focusplatform.entities.User;
+import com.example.focusplatform.repositories.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
+import java.util.Map;
+import java.util.HashMap;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthService authService;
+    private final UserRepository userRepository; // 1. Added the repository instance
 
-    public AuthController(AuthService authService) {
+    // 2. Injected the repository into the constructor
+    public AuthController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request,
                                                  HttpServletResponse response) {
         AuthResponse authResponse = authService.register(request);
-
-        // 1. Put the token safely inside the HttpOnly Cookie
         addJwtCookie(response, authResponse.getToken());
-
-        // 2. CRITICAL FIX: Erase the token from the object before sending the JSON back.
-        // This ensures React only gets the user's name and role, while the browser handles the token.
         authResponse.setToken(null);
-
         return ResponseEntity.ok(authResponse);
     }
 
@@ -39,24 +42,18 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request,
                                               HttpServletResponse response) {
         AuthResponse authResponse = authService.login(request);
-
-        // 1. Put the token safely inside the HttpOnly Cookie
         addJwtCookie(response, authResponse.getToken());
-
-        // 2. CRITICAL FIX: Erase the token from the object before sending the JSON back.
         authResponse.setToken(null);
-
         return ResponseEntity.ok(authResponse);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletResponse response) {
-        // Clear the cookie by setting maxAge to 0
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
-                .secure(false)          // Set to true in production (HTTPS)
+                .secure(false)
                 .path("/")
-                .maxAge(0)              // Immediately expire
+                .maxAge(0)
                 .sameSite("Lax")
                 .build();
 
@@ -64,19 +61,36 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    // -----------------------------------------------------------------------
-    // Helper: writes the JWT into an HttpOnly cookie so the browser always
-    // sends it automatically. "HttpOnly" means JS cannot read it → safer.
-    // -----------------------------------------------------------------------
     private void addJwtCookie(HttpServletResponse response, String token) {
         ResponseCookie cookie = ResponseCookie.from("jwt", token)
-                .httpOnly(true)         // Not accessible via JavaScript
-                .secure(false)          // Set to true in production (requires HTTPS)
-                .path("/")              // Sent on every request to this server
-                .maxAge(10 * 60 * 60)   // 10 hours — matches JWT_EXPIRATION in JwtUtil
-                .sameSite("Lax")        // Protects against CSRF while allowing normal navigation
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(10 * 60 * 60)
+                .sameSite("Lax")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        String email = principal.getName();
+
+        // 3. FIXED: Using the lowercase 'userRepository' instance
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Map<String, Object> userProfile = new HashMap<>();
+        userProfile.put("id", user.getId());
+        userProfile.put("name", user.getName());
+        userProfile.put("email", user.getEmail());
+        userProfile.put("role", user.getRole());
+
+        return ResponseEntity.ok(userProfile);
     }
 }
