@@ -12,7 +12,7 @@ public class QuestionResponseDTO {
     private String questionText;
     private String options;
     /** Correct choice key: A, B, C, or D */
-    private String correctOption;
+    private String correctAnswer;
     private Long courseId;
 
     public static QuestionResponseDTO from(Question question) {
@@ -20,7 +20,7 @@ public class QuestionResponseDTO {
         dto.setId(question.getId());
         dto.setQuestionText(question.getQuestionText());
         dto.setOptions(question.getOptions());
-        dto.setCorrectOption(question.getCorrectAnswer());
+        dto.setCorrectAnswer(question.getCorrectAnswer());
         dto.setCourseId(question.getCourse() != null ? question.getCourse().getId() : null);
         return dto;
     }
