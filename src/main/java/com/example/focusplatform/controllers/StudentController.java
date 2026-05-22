@@ -6,9 +6,11 @@ import com.example.focusplatform.entities.Classroom;
 import com.example.focusplatform.entities.CourseContent;
 import com.example.focusplatform.entities.Question;
 import com.example.focusplatform.services.StudentService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -28,13 +30,17 @@ public class StudentController {
         Classroom classroom = studentService.enrollInClassroom(studentEmail, request.getInviteCode());
         return ResponseEntity.ok("Successfully enrolled in classroom: " + classroom.getName());
     }
-
-    // --- Track when a student starts the course ---
     @PostMapping("/courses/{courseId}/start")
     public ResponseEntity<String> startCourse(@PathVariable Long courseId, Authentication authentication) {
-        String studentEmail = authentication.getName();
-        studentService.markCourseAsStarted(studentEmail, courseId);
-        return ResponseEntity.ok("Course started. Time recorded!");
+        try {
+            studentService.markCourseAsStarted(authentication.getName(), courseId);
+            return ResponseEntity.ok("Course started. Time recorded!");
+        } catch (ResponseStatusException e) {
+            // Re-throw so Spring returns the correct HTTP status (409)
+            throw e;
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // Fetch Course Content
@@ -49,13 +55,17 @@ public class StudentController {
         return ResponseEntity.ok(studentService.getCourseQuestions(courseId));
     }
 
-    /** @deprecated Prefer {@code POST /api/student/quiz/submit} (same contract). */
+
     @PostMapping("/submit")
     public ResponseEntity<String> submitQuiz(@RequestBody QuizSubmitRequest request, Authentication authentication) {
         try {
             String result = studentService.submitQuiz(authentication.getName(), request);
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
+            // FIX: Return 409 specifically for already-completed so frontend can detect it
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already completed")) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

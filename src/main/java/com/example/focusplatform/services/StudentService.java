@@ -124,9 +124,10 @@ public class StudentService {
         CourseProgress progress = courseProgressRepository.findFirstByStudentAndCourse(student, course)
                 .orElseThrow(() -> new RuntimeException("Course progress not found. Did you start the course?"));
 
+
         // 2. Prevent re-submission if they already completed it
         if (progress.isCompleted()) {
-            return "You have already completed this course in " + progress.getDurationSeconds() + " seconds.";
+            throw new RuntimeException("You have already completed this course.");
         }
 
         // 3. Stamp the submission time

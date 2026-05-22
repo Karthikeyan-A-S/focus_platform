@@ -4,12 +4,15 @@ import com.example.focusplatform.dto.QuizAnswerRequest;
 import com.example.focusplatform.entities.CourseSession;
 import com.example.focusplatform.entities.Question;
 import com.example.focusplatform.entities.QuizResponse;
+import com.example.focusplatform.repositories.CourseProgressRepository;
 import com.example.focusplatform.repositories.CourseSessionRepository;
 import com.example.focusplatform.repositories.QuestionRepository;
 import com.example.focusplatform.repositories.QuizResponseRepository;
 import com.example.focusplatform.util.QuestionOptionUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -21,15 +24,18 @@ public class QuizService {
     private final CourseSessionRepository sessionRepository;
     private final QuestionRepository questionRepository;
     private final AttemptRecordingService attemptRecordingService;
+    private final CourseProgressRepository courseProgressRepository;
 
     public QuizService(QuizResponseRepository quizResponseRepository,
                        CourseSessionRepository sessionRepository,
                        QuestionRepository questionRepository,
-                       AttemptRecordingService attemptRecordingService) {
+                       AttemptRecordingService attemptRecordingService,
+                       CourseProgressRepository courseProgressRepository) {
         this.quizResponseRepository = quizResponseRepository;
         this.sessionRepository = sessionRepository;
         this.questionRepository = questionRepository;
         this.attemptRecordingService = attemptRecordingService;
+        this.courseProgressRepository = courseProgressRepository;
     }
 
     @Transactional
@@ -37,6 +43,13 @@ public class QuizService {
         // 1. Fetch the active timer session
         CourseSession session = sessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new RuntimeException("Session not found"));
+
+        // --- FIXED: THE SECURITY LOCK ---
+        // Changed to existsByStudentIdAndCourseId to match your repository exactly!
+        if (courseProgressRepository.existsByStudentIdAndCourseId(session.getStudent().getId(), session.getCourse().getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You have already completed this course. Further submissions are locked.");
+        }
+        // ------------------------------
 
         if (session.getEndTime() != null) {
             throw new RuntimeException("Cannot submit answers to a closed session");

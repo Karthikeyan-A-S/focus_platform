@@ -17,6 +17,9 @@ public interface CourseProgressRepository extends JpaRepository<CourseProgress, 
 
     boolean existsByStudentAndCourse(User student, Course course);
 
+    // --- CRITICAL FIX: Changed UserId to StudentId ---
+    boolean existsByStudentIdAndCourseId(Long studentId, Long courseId);
+
     Optional<CourseProgress> findFirstByStudentAndCourse(User student, Course course);
 
     @Modifying
